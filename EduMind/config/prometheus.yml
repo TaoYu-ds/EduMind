@@ -1,0 +1,26 @@
+# Prometheus 配置文件 — EduMind 智学助手（教育培训场景）
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'edumind'
+    environment: 'production'
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  # EduMind 主应用指标
+  - job_name: 'edumind-app'
+    static_configs:
+      - targets: ['edumind:8000']
+        labels:
+          service: 'edumind'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Prometheus 自监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

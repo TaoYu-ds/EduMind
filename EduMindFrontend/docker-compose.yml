@@ -1,0 +1,132 @@
+services:
+  edumind-python:
+    build:
+      context: ../EduMind
+      dockerfile: Dockerfile
+      target: production
+    container_name: edumind-python
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - ../EduMind/.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-edumind123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-edumind123}@redis:6379/0
+      CHROMA_PERSIST_DIRECTORY: /app/data/chroma
+      EVAL_BASELINE_PATH: /app/data/eval/baseline.json
+      EDUMIND_SKILLS_DIR: /app/skills
+    volumes:
+      - edumind-python-data:/app/data
+      - ../EduMind/skills:/app/skills
+      - ../EduMind/config/mcp_servers.json:/app/config/mcp_servers.json:ro
+    depends_on:
+      redis:
+        condition: service_started
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+  edumind-java:
+    build:
+      context: ../EduMindJava
+      dockerfile: Dockerfile
+    container_name: edumind-java
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - ../EduMindJava/.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-edumind123}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      EDUMIND_DATA_DIR: /app/data/java
+      KNOWLEDGE_STORE_PATH: /app/data/java/knowledge-store.json
+      MEMORY_STORE_PATH: /app/data/java/memory-store.json
+      EDUMIND_SKILLS_DIR: /app/skills
+    volumes:
+      - edumind-java-data:/app/data
+      - ../EduMindJava/skills:/app/skills
+    depends_on:
+      redis:
+        condition: service_started
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: edumind-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-edumind123}
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: edumind-chromadb
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edumind-frontend
+    environment:
+      PYTHON_API_URL: /api/python
+      JAVA_API_URL: /api/java
+    ports:
+      - "${FRONTEND_PORT:-5174}:80"
+    depends_on:
+      edumind-python:
+        condition: service_started
+      edumind-java:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: edumind-gateway
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./docker/nginx-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      edumind-python:
+        condition: service_started
+      edumind-java:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - edumind-network
+
+networks:
+  edumind-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  chromadb-data:
+  edumind-python-data:
+  edumind-java-data:
