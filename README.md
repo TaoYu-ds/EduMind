@@ -15,6 +15,14 @@ EduMind 是一个**可跑、可评测、可观测**的学习辅导 Agent 系统�
 
 它不是把 ChatGPT 套个网页壳：路由是可解释的加权融合、检索带元数据过滤、记忆分短期/情景/画像三层、每个 Agent 的提示词来自可热加载的 Markdown 规范、故障有熔断降权、质量有回归基线。
 
+<p align="center">
+  <img src="docs/preview.png" alt="EduMind 调试工作台" width="860">
+</p>
+
+<p align="center">
+  <sub>Vue 3 调试工作台：对话 / 知识库 / 评测 / 运行轨迹，支持 Java 与 Python 双后端切换</sub>
+</p>
+
 ---
 
 ## 核心能力
