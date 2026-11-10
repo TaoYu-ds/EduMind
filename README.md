@@ -189,6 +189,7 @@ uvicorn api.main:app --reload
 | 从零读懂代码（12 篇系列教程） | [wiki/教程/](TutorMesh/wiki/教程/) |
 | 业务流程与角色边界 | [教育培训业务流程说明.md](TutorMesh/wiki/教育培训业务流程说明.md) |
 | 二次开发 / 换业务场景 | [教育培训场景扩展与改造指南.md](TutorMesh/wiki/教育培训场景扩展与改造指南.md) |
+| 场景改造全过程（文件级改动 + 设计取舍） | [教育培训场景改造说明.md](TutorMesh/wiki/教育培训场景改造说明.md) |
 | 接口与数据字典 | [教育培训教程-附录-接口配置与数据字典.md](TutorMesh/wiki/教程/教育培训教程-附录-接口配置与数据字典.md) |
 | 后端完整说明 | [TutorMesh/README.md](TutorMesh/README.md) |
 
