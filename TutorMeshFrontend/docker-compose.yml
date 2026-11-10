@@ -1,0 +1,132 @@
+services:
+  tutormesh-python:
+    build:
+      context: ../TutorMesh
+      dockerfile: Dockerfile
+      target: production
+    container_name: tutormesh-python
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - ../TutorMesh/.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-tutormesh123}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-tutormesh123}@redis:6379/0
+      CHROMA_PERSIST_DIRECTORY: /app/data/chroma
+      EVAL_BASELINE_PATH: /app/data/eval/baseline.json
+      TUTORMESH_SKILLS_DIR: /app/skills
+    volumes:
+      - tutormesh-python-data:/app/data
+      - ../TutorMesh/skills:/app/skills
+      - ../TutorMesh/config/mcp_servers.json:/app/config/mcp_servers.json:ro
+    depends_on:
+      redis:
+        condition: service_started
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+  tutormesh-java:
+    build:
+      context: ../TutorMeshJava
+      dockerfile: Dockerfile
+    container_name: tutormesh-java
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - ../TutorMeshJava/.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-tutormesh123}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      TUTORMESH_DATA_DIR: /app/data/java
+      KNOWLEDGE_STORE_PATH: /app/data/java/knowledge-store.json
+      MEMORY_STORE_PATH: /app/data/java/memory-store.json
+      TUTORMESH_SKILLS_DIR: /app/skills
+    volumes:
+      - tutormesh-java-data:/app/data
+      - ../TutorMeshJava/skills:/app/skills
+    depends_on:
+      redis:
+        condition: service_started
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tutormesh-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-tutormesh123}
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: tutormesh-chromadb
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tutormesh-frontend
+    environment:
+      PYTHON_API_URL: /api/python
+      JAVA_API_URL: /api/java
+    ports:
+      - "${FRONTEND_PORT:-5174}:80"
+    depends_on:
+      tutormesh-python:
+        condition: service_started
+      tutormesh-java:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: tutormesh-gateway
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./docker/nginx-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      tutormesh-python:
+        condition: service_started
+      tutormesh-java:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - tutormesh-network
+
+networks:
+  tutormesh-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  chromadb-data:
+  tutormesh-python-data:
+  tutormesh-java-data:

@@ -1,4 +1,4 @@
-# EduMind · 面向在线教育场景的多 Agent 学习辅导系统
+# TutorMesh · 面向在线教育场景的多 Agent 学习辅导系统
 
 <p align="left">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
@@ -11,12 +11,12 @@
   <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
 </p>
 
-EduMind 是一个**可跑、可评测、可观测**的学习辅导 Agent 系统。它把「三路意图识别 → 主辅 Agent 路由 → 结构化 RAG 检索 → 分层记忆/学习画像 → 动态 Skills 注入 → 异步评测与在线监控」串成一条完整的对话链路，用来回答一个工程问题：**多 Agent 到底该怎么拆、拆完怎么让它不失控。**
+TutorMesh 是一个**可跑、可评测、可观测**的学习辅导 Agent 系统。它把「三路意图识别 → 主辅 Agent 路由 → 结构化 RAG 检索 → 分层记忆/学习画像 → 动态 Skills 注入 → 异步评测与在线监控」串成一条完整的对话链路，用来回答一个工程问题：**多 Agent 到底该怎么拆、拆完怎么让它不失控。**
 
 它不是把 ChatGPT 套个网页壳：路由是可解释的加权融合、检索带元数据过滤、记忆分短期/情景/画像三层、每个 Agent 的提示词来自可热加载的 Markdown 规范、故障有熔断降权、质量有回归基线。
 
 <p align="center">
-  <img src="docs/preview.png" alt="EduMind 调试工作台" width="860">
+  <img src="docs/preview.png" alt="TutorMesh 调试工作台" width="860">
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@ EduMind 是一个**可跑、可评测、可观测**的学习辅导 Agent 系统�
 | **结构化 RAG** | 知识库按 `学科/章节/难度/年级/文档类型` 打标签，检索先元数据过滤再向量召回；`search_with_rewrite` 把「这个不会」改写成可检索的教材问法 |
 | **分层记忆与学习画像** | Redis 存近期消息 + 滚动摘要；ChromaDB 存情景记忆与画像（年级、薄弱章节、目标、可投入时间），讲解与排计划时作为上下文注入 |
 | **动态 Skills** | 业务规范写在 Markdown 里，按 Agent + 关键词匹配后注入提示词，支持运行时热重载，改规则不用改代码 |
-| **标准 MCP** | 基于官方 SDK 接入外部 MCP 工具，同时把本地知识库以 MCP 资源（`edumind://knowledge/stats`）暴露给其他客户端 |
+| **标准 MCP** | 基于官方 SDK 接入外部 MCP 工具，同时把本地知识库以 MCP 资源（`tutormesh://knowledge/stats`）暴露给其他客户端 |
 | **稳定性工程** | 会话并发锁、重复请求回执、工具超时/缓存/熔断、专业 Agent 故障回退、请求 ID 全链路轨迹 |
 | **评测与监控** | 异步评测任务（意图准确率、对话质量、Few-shot 回归基线）+ Prometheus 指标 + 路由降权/冷却恢复机制 |
 | **可观测的 Web 控制台** | Vue 3 调试工作台：对话、知识库导入检索、评测任务、调用轨迹、后端切换 |
@@ -72,7 +72,7 @@ flowchart TB
 
     subgraph Tools["工具与知识"]
         RAG["结构化 RAG<br/>元数据过滤 + 向量召回"]
-        MCP_S["MCP Server<br/>edumind://knowledge"]
+        MCP_S["MCP Server<br/>tutormesh://knowledge"]
         MCP_C["MCP Client<br/>外部工具接入"]
     end
 
@@ -122,8 +122,8 @@ flowchart TB
 ## 仓库结构
 
 ```text
-EduMind/
-├── EduMind/                    # Python 后端（FastAPI · 主实现）
+TutorMesh/
+├── TutorMesh/                    # Python 后端（FastAPI · 主实现）
 │   ├── api/main.py             # HTTP 入口、鉴权、CLI
 │   ├── core/                   # 意图识别、并发、会话状态、Skills 加载、监控
 │   ├── agents/                 # Agent 编排器与工具集
@@ -135,7 +135,7 @@ EduMind/
 │   ├── tests/                  # 单测与回归用例
 │   ├── wiki/                   # 架构图、12 篇教程、业务流程与技术亮点文档
 │   └── docker-compose.yml      # 一键拉起 API + Redis + ChromaDB + Prometheus + Nginx
-└── EduMindFrontend/            # Vue 3 + Vite 调试工作台
+└── TutorMeshFrontend/            # Vue 3 + Vite 调试工作台
     ├── src/                    # 对话、知识库、评测、轨迹等视图
     └── docker/                 # 网关配置与容器入口
 ```
@@ -145,7 +145,7 @@ EduMind/
 ### 方式一：Docker Compose（推荐）
 
 ```bash
-cd EduMind
+cd TutorMesh
 cp .env.example .env          # 填入 ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL
 docker compose up -d --build
 ```
@@ -161,7 +161,7 @@ docker compose up -d --build
 ### 方式二：连同 Web 前端一起跑
 
 ```bash
-cd EduMind
+cd TutorMesh
 docker compose -f docker-compose.yml -f docker-compose.web.yml up -d --build
 ```
 
@@ -170,7 +170,7 @@ docker compose -f docker-compose.yml -f docker-compose.web.yml up -d --build
 ### 方式三：本地开发
 
 ```bash
-cd EduMind
+cd TutorMesh
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env
@@ -179,18 +179,18 @@ uvicorn api.main:app --reload
 
 ## 文档索引
 
-面向不同读者的入口都在 [`EduMind/wiki/`](EduMind/wiki/)：
+面向不同读者的入口都在 [`TutorMesh/wiki/`](TutorMesh/wiki/)：
 
 | 想了解什么 | 看这篇 |
 |---|---|
-| 项目定位、技术亮点 | [教育培训场景定位与技术亮点.md](EduMind/wiki/教育培训场景定位与技术亮点.md) |
-| 完整使用指南（配置、接口、数据字典） | [教育培训完整使用指南.md](EduMind/wiki/教育培训完整使用指南.md) |
-| 架构图与流程图 | [教育培训架构图.md](EduMind/wiki/教育培训架构图.md) · [assets/architecture](EduMind/wiki/assets/architecture) |
-| 从零读懂代码（12 篇系列教程） | [wiki/教程/](EduMind/wiki/教程/) |
-| 业务流程与角色边界 | [教育培训业务流程说明.md](EduMind/wiki/教育培训业务流程说明.md) |
-| 二次开发 / 换业务场景 | [教育培训场景扩展与改造指南.md](EduMind/wiki/教育培训场景扩展与改造指南.md) |
-| 接口与数据字典 | [教育培训教程-附录-接口配置与数据字典.md](EduMind/wiki/教程/教育培训教程-附录-接口配置与数据字典.md) |
-| 后端完整说明 | [EduMind/README.md](EduMind/README.md) |
+| 项目定位、技术亮点 | [教育培训场景定位与技术亮点.md](TutorMesh/wiki/教育培训场景定位与技术亮点.md) |
+| 完整使用指南（配置、接口、数据字典） | [教育培训完整使用指南.md](TutorMesh/wiki/教育培训完整使用指南.md) |
+| 架构图与流程图 | [教育培训架构图.md](TutorMesh/wiki/教育培训架构图.md) · [assets/architecture](TutorMesh/wiki/assets/architecture) |
+| 从零读懂代码（12 篇系列教程） | [wiki/教程/](TutorMesh/wiki/教程/) |
+| 业务流程与角色边界 | [教育培训业务流程说明.md](TutorMesh/wiki/教育培训业务流程说明.md) |
+| 二次开发 / 换业务场景 | [教育培训场景扩展与改造指南.md](TutorMesh/wiki/教育培训场景扩展与改造指南.md) |
+| 接口与数据字典 | [教育培训教程-附录-接口配置与数据字典.md](TutorMesh/wiki/教程/教育培训教程-附录-接口配置与数据字典.md) |
+| 后端完整说明 | [TutorMesh/README.md](TutorMesh/README.md) |
 
 ## 技术栈
 
