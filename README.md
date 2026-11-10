@@ -20,7 +20,7 @@ TutorMesh 是一个**可跑、可评测、可观测**的学习辅导 Agent 系�
 </p>
 
 <p align="center">
-  <sub>Vue 3 调试工作台：对话 / 知识库 / 评测 / 运行轨迹，支持 Java 与 Python 双后端切换</sub>
+  <sub>Vue 3 调试工作台实拍：左侧是真实对话（高一导数求单调区间），右侧是这次请求的运行轨迹——意图 knowledge_query、主 Agent 为 tutor、响应 8.1s、路由置信度 90%、工具调用 2 次</sub>
 </p>
 
 ---
