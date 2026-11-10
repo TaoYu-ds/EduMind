@@ -1,6 +1,7 @@
 """LLM response helpers shared by Anthropic-compatible providers."""
 from typing import Any, Iterable, List
 from urllib.parse import urlsplit
+import os
 import time
 
 from core.performance import record_llm_call
@@ -9,16 +10,17 @@ from core.performance import record_llm_call
 async def create_message(client: Any, *, stage: str = "unspecified", **kwargs: Any) -> Any:
     """Call bounded support tasks without DeepSeek's implicit thinking budget.
 
-    DeepSeek enables thinking by default, and those tokens share max_tokens with
-    the answer. A short JSON request can therefore finish with thinking only.
-    Use extra_body for compatibility with the pinned Anthropic SDK; leave other
-    providers and explicitly configured thinking modes unchanged.
+    DeepSeek V4 系列（deepseek-flash / deepseek-v4-pro）要求显式指定 effort，
+    否则 /v1/messages 直接返回 500；同时它默认开启 thinking，短 JSON 请求
+    容易把 max_tokens 全耗在思考上。两者都通过 extra_body 透传，
+    对其他 Anthropic 兼容服务不产生任何影响。
     """
     if urlsplit(str(getattr(client, "base_url", ""))).hostname == "api.deepseek.com":
         extra_body = dict(kwargs.get("extra_body") or {})
+        extra_body.setdefault("effort", os.getenv("EDUMIND_DEEPSEEK_EFFORT", "low"))
         if "thinking" not in kwargs and "thinking" not in extra_body:
             extra_body["thinking"] = {"type": "disabled"}
-            kwargs["extra_body"] = extra_body
+        kwargs["extra_body"] = extra_body
     started, response, status = time.monotonic(), None, "error"
     try:
         response = await client.messages.create(**kwargs)
