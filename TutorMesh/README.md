@@ -29,7 +29,7 @@ TutorMesh 是面向 **在线教育场景** 的多 Agent 学习辅导应用，提
 |---|---|
 | 三路意图识别 | LLM、向量相似度、Pattern 规则共同识别意图，覆盖知识点提问、作业辅导、学习计划、考试信息、课程推荐五类教学诉求，输出学科/章节/年级等实体。 |
 | 主辅 Agent 路由 | 在 General（学习服务台）、Tutor（讲题）、Plan（计划）、Exam（考试）、Escalation（转人工/老师）之间选择处理路径；复合问题并行执行主辅 Agent 再合成回复。 |
-| 结构化 RAG | 知识库按学科/章节/难度/文档类型打标签，检索时先元数据过滤再向量召回；`search_with_rewrite` 把"这个不会"改写成可检索的教材问法。 |
+| 混合检索 RAG | 知识库按学科/章节/难度/文档类型打标签；BM25 关键词召回与向量召回归一化后加权融合（默认 0.45/0.55），`search_with_rewrite` 再做多子查询改写、去重与 LLM 重排。 |
 | 学习画像 | Redis 保存近期消息和摘要；ChromaDB 保存情景记忆及学习画像（年级、学科、薄弱章节、目标、可投入时间），讲解和排计划时作为输入。 |
 | 标准 MCP | 通过官方 Python SDK 接入外部 MCP 服务，也将本地知识库暴露给其他 MCP 客户端。 |
 | 动态 Skills | 从 Markdown 文件加载业务规范，根据 Agent 和关键词匹配后注入提示词，支持运行时重载。 |
@@ -232,7 +232,7 @@ docker compose --env-file ../TutorMesh/.env up -d --build --force-recreate tutor
 | 用途 | 模型与存储 |
 |---|---|
 | 三路意图识别中的向量匹配 | 默认本地字符 n-gram，可配置硅基流动 `BAAI/bge-m3`。 |
-| RAG 知识库及 ChromaDB 记忆检索 | 使用 ChromaDB 默认的本地 `all-MiniLM-L6-v2` 向量模型。 |
+| RAG 知识库及 ChromaDB 记忆检索 | 使用 ChromaDB 默认的本地 `all-MiniLM-L6-v2` 向量模型；该模型为英文模型，对中文语料区分度有限，因此知识检索额外接入 BM25 关键词召回做加权融合（见 `evaluation/results/retrieval_eval.md`）。 |
 
 本节只配置**意图识别的向量分支**，不会替换 RAG 模型，也不需要重建知识库。硅基流动的免费模型范围、账号权限和限流以[官方价格页](https://siliconflow.cn/pricing)为准；项目固定使用非 Pro 的 `BAAI/bge-m3`，不会自动切换到 `Pro/BAAI/bge-m3`。聊天及评测的 LLM 费用由对应服务商计算。
 

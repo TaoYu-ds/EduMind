@@ -31,7 +31,7 @@ TutorMesh 是一个**可跑、可评测、可观测**的学习辅导 Agent 系�
 |---|---|
 | **三路意图识别** | LLM + Embedding 向量 + Pattern 规则加权融合（默认 0.7 / 0.2 / 0.1），输出意图 + 学科/章节/年级实体；单路失败自动降级，不阻塞对话 |
 | **主辅 Agent 路由** | General（学习服务台）/ Tutor（讲题）/ Plan（计划）/ Exam（考试）/ Escalation（转人工）五个角色；复合诉求并行执行主辅 Agent 再合成回复 |
-| **结构化 RAG** | 知识库按 `学科/章节/难度/年级/文档类型` 打标签，检索先元数据过滤再向量召回；`search_with_rewrite` 把「这个不会」改写成可检索的教材问法 |
+| **混合检索 RAG** | 知识库按 `学科/章节/难度/年级/文档类型` 打标签；BM25 关键词召回与向量召回分数归一化后加权融合（0.45/0.55），再做查询改写与 LLM 重排。自建 42 条评测集实测 Recall@1 从 28.6% → 69.1% → 97.6%（纯向量 / 融合 / 加改写重排） |
 | **分层记忆与学习画像** | Redis 存近期消息 + 滚动摘要；ChromaDB 存情景记忆与画像（年级、薄弱章节、目标、可投入时间），讲解与排计划时作为上下文注入 |
 | **动态 Skills** | 业务规范写在 Markdown 里，按 Agent + 关键词匹配后注入提示词，支持运行时热重载，改规则不用改代码 |
 | **标准 MCP** | 基于官方 SDK 接入外部 MCP 工具，同时把本地知识库以 MCP 资源（`tutormesh://knowledge/stats`）暴露给其他客户端 |
@@ -71,7 +71,7 @@ flowchart TB
     end
 
     subgraph Tools["工具与知识"]
-        RAG["结构化 RAG<br/>元数据过滤 + 向量召回"]
+        RAG["混合检索 RAG<br/>BM25 + 向量融合 + LLM 重排"]
         MCP_S["MCP Server<br/>tutormesh://knowledge"]
         MCP_C["MCP Client<br/>外部工具接入"]
     end
@@ -198,6 +198,28 @@ uvicorn api.main:app --reload
 **后端**：FastAPI 0.115 · Uvicorn · Pydantic 2 · Anthropic SDK · ChromaDB 0.5 · Redis 7 · MCP 1.26 · Prometheus Client
 **前端**：Vue 3.5 · Vite 7 · 原生 ESM 组件
 **部署**：Docker Compose · Nginx · Prometheus
+
+## 检索评测
+
+知识库只有 14 篇教材 / 15 个片段，为了判断"到底该不该上混合检索"，自建了 42 条标注查询
+（术语型 18 / 口语型 24，标注每句话应该命中哪篇教材），在三套配置上跑同一批用例：
+
+| 配置 | Recall@1 | Recall@5 | MRR@10 | 平均耗时 |
+| --- | ---: | ---: | ---: | ---: |
+| 纯向量（ChromaDB 默认 embedding） | 28.57% | 57.14% | 0.4056 | 38 ms |
+| + BM25 加权融合 | 69.05% | 100.00% | 0.8155 | 44 ms |
+| + 查询改写 + LLM 重排 | **97.62%** | 100.00% | **0.9881** | 2084 ms |
+
+结论与取舍：
+
+- **BM25 是这个项目当前召回的主力**。ChromaDB 默认 embedding 是英文模型 `all-MiniLM-L6-v2`，
+  对中文接近随机，纯向量基线因此偏低；接入 BM25 后 Recall@1 从 28.6% 提到 69.1%，代价只有 6 ms。
+- **改写 + 重排能把 Recall@1 推到 97.6%**，但要多付 2 秒。所以默认链路只开融合不开重排，
+  重排留给"答错了代价更高"的场景。
+- Top-5 在这么小的语料上会饱和（融合后就是 100%），所以看 **Recall@1 和 MRR** 才有区分度；
+  这套数字只适合同数据集横向对比，不能外推到大语料。
+
+复跑方式与偏差说明见 [`evaluation/results/retrieval_eval.md`](evaluation/results/retrieval_eval.md)。
 
 ## 设计取舍
 

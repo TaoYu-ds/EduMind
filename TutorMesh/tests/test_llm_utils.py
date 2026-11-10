@@ -131,9 +131,10 @@ def test_explicit_thinking_and_extra_body_are_preserved():
         client = SimpleNamespace(base_url="https://api.deepseek.com/anthropic", messages=SimpleNamespace(create=create))
         explicit = {"thinking":{"type":"enabled"}, "metadata":{"user_id":"u"}}
         await create_message(client, extra_body=explicit)
-        assert create.call_args.kwargs["extra_body"] == explicit
+        # DeepSeek 分支会补上 effort（默认 low），其余显式字段必须原样保留。
+        assert create.call_args.kwargs["extra_body"] == {**explicit, "effort": "low"}
         body = {"metadata":{"user_id":"u"}}
         await create_message(client, extra_body=body)
-        assert create.call_args.kwargs["extra_body"] == {**body, "thinking":{"type":"disabled"}}
+        assert create.call_args.kwargs["extra_body"] == {**body, "thinking":{"type":"disabled"}, "effort": "low"}
         assert body == {"metadata":{"user_id":"u"}}
     asyncio.run(run())

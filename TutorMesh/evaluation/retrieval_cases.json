@@ -1,0 +1,342 @@
+{
+  "description": "TutorMesh 检索评测集：gold_titles 为人工标注的正确文档标题（片段级），style 区分术语型与口语型提问",
+  "version": "1.0",
+  "cases": [
+    {
+      "id": "MATH-FUNC-01",
+      "query": "函数单调性的定义法证明步骤是什么",
+      "style": "term",
+      "gold_titles": [
+        "函数单调性的定义与判定"
+      ]
+    },
+    {
+      "id": "MATH-FUNC-02",
+      "query": "我证单调性的时候作差之后老是不知道往哪化简",
+      "style": "colloquial",
+      "gold_titles": [
+        "函数单调性的定义与判定"
+      ]
+    },
+    {
+      "id": "MATH-FUNC-03",
+      "query": "复合函数同增异减怎么判断",
+      "style": "term",
+      "gold_titles": [
+        "函数单调性的定义与判定"
+      ]
+    },
+    {
+      "id": "MATH-DERIV-01",
+      "query": "导数的几何意义是什么",
+      "style": "term",
+      "gold_titles": [
+        "导数的定义、几何意义与应用"
+      ]
+    },
+    {
+      "id": "MATH-DERIV-02",
+      "query": "切线斜率跟导数到底什么关系，做题时怎么用",
+      "style": "colloquial",
+      "gold_titles": [
+        "导数的定义、几何意义与应用"
+      ]
+    },
+    {
+      "id": "MATH-DERIV-03",
+      "query": "f'(x)=0 的点一定是极值点吗",
+      "style": "term",
+      "gold_titles": [
+        "导数的定义、几何意义与应用"
+      ]
+    },
+    {
+      "id": "MATH-TRIG-01",
+      "query": "三角函数图像的周期和对称轴怎么求",
+      "style": "term",
+      "gold_titles": [
+        "三角函数图像与性质"
+      ]
+    },
+    {
+      "id": "MATH-TRIG-02",
+      "query": "sin 和 cos 的图像我总是记混，怎么区分",
+      "style": "colloquial",
+      "gold_titles": [
+        "三角函数图像与性质"
+      ]
+    },
+    {
+      "id": "MATH-QUAD-01",
+      "query": "一元二次方程判别式的三种情况",
+      "style": "term",
+      "gold_titles": [
+        "一元二次方程的解法与判别式"
+      ]
+    },
+    {
+      "id": "MATH-QUAD-02",
+      "query": "解方程的时候什么时候要用求根公式，什么时候直接因式分解",
+      "style": "colloquial",
+      "gold_titles": [
+        "一元二次方程的解法与判别式"
+      ]
+    },
+    {
+      "id": "PHY-NEWTON-01",
+      "query": "牛顿第二定律的表达式和适用条件",
+      "style": "term",
+      "gold_titles": [
+        "牛顿运动定律"
+      ]
+    },
+    {
+      "id": "PHY-NEWTON-02",
+      "query": "受力分析的时候老是漏掉摩擦力怎么办",
+      "style": "colloquial",
+      "gold_titles": [
+        "牛顿运动定律"
+      ]
+    },
+    {
+      "id": "PHY-NEWTON-03",
+      "query": "作用力与反作用力和平衡力的区别",
+      "style": "term",
+      "gold_titles": [
+        "牛顿运动定律"
+      ]
+    },
+    {
+      "id": "PHY-FIELD-01",
+      "query": "电场强度和电势的区别与联系",
+      "style": "term",
+      "gold_titles": [
+        "电场强度与电势"
+      ]
+    },
+    {
+      "id": "PHY-FIELD-02",
+      "query": "电场线密的地方是不是电势也高",
+      "style": "colloquial",
+      "gold_titles": [
+        "电场强度与电势"
+      ]
+    },
+    {
+      "id": "ENG-TENSE-01",
+      "query": "现在完成时和一般过去时的区别",
+      "style": "term",
+      "gold_titles": [
+        "英语时态体系与常见混淆"
+      ]
+    },
+    {
+      "id": "ENG-TENSE-02",
+      "query": "写作文的时候老是把时态用乱，怎么系统梳理一遍",
+      "style": "colloquial",
+      "gold_titles": [
+        "英语时态体系与常见混淆"
+      ]
+    },
+    {
+      "id": "ENG-CLAUSE-01",
+      "query": "定语从句关系代词 that 和 which 怎么选",
+      "style": "term",
+      "gold_titles": [
+        "定语从句关系词的选择"
+      ]
+    },
+    {
+      "id": "ENG-CLAUSE-02",
+      "query": "从句里什么时候可以用 where，我一直拿不准",
+      "style": "colloquial",
+      "gold_titles": [
+        "定语从句关系词的选择"
+      ]
+    },
+    {
+      "id": "GEN-METHOD-01",
+      "query": "间隔重复和主动回忆具体怎么操作",
+      "style": "term",
+      "gold_titles": [
+        "高效学习方法：间隔重复与主动回忆"
+      ]
+    },
+    {
+      "id": "GEN-METHOD-02",
+      "query": "背了就忘，有没有更省时间的复习节奏",
+      "style": "colloquial",
+      "gold_titles": [
+        "高效学习方法：间隔重复与主动回忆"
+      ]
+    },
+    {
+      "id": "GEN-GAOKAO-01",
+      "query": "高考报名流程和需要准备的材料",
+      "style": "term",
+      "gold_titles": [
+        "高考报名与成绩查询流程（通用说明）"
+      ]
+    },
+    {
+      "id": "GEN-GAOKAO-02",
+      "query": "高考成绩什么时候能查，在哪里查",
+      "style": "colloquial",
+      "gold_titles": [
+        "高考报名与成绩查询流程（通用说明）"
+      ]
+    },
+    {
+      "id": "GEN-CET-01",
+      "query": "大学英语四六级报名时间和准考证打印",
+      "style": "term",
+      "gold_titles": [
+        "大学英语四六级报名与成绩查询（通用说明）"
+      ]
+    },
+    {
+      "id": "GEN-CET-02",
+      "query": "四级考完多久出分，查分入口是哪个",
+      "style": "colloquial",
+      "gold_titles": [
+        "大学英语四六级报名与成绩查询（通用说明）"
+      ]
+    },
+    {
+      "id": "COURSE-SYNC-01",
+      "query": "同步提升课高一数学讲哪些内容，适合什么基础",
+      "style": "term",
+      "gold_titles": [
+        "同步提升课：高一数学（函数与导数入门）"
+      ]
+    },
+    {
+      "id": "COURSE-SYNC-02",
+      "query": "孩子函数和导数都不太好，有没有能跟校内进度走的课",
+      "style": "colloquial",
+      "gold_titles": [
+        "同步提升课：高一数学（函数与导数入门）"
+      ]
+    },
+    {
+      "id": "COURSE-SPRINT-01",
+      "query": "冲刺课高中物理力学专题的课程安排",
+      "style": "term",
+      "gold_titles": [
+        "冲刺课：高中物理力学专题"
+      ]
+    },
+    {
+      "id": "COURSE-SPRINT-02",
+      "query": "快要考试了，力学这块想突击一下，有短期班吗",
+      "style": "colloquial",
+      "gold_titles": [
+        "冲刺课：高中物理力学专题"
+      ]
+    },
+    {
+      "id": "PLATFORM-01",
+      "query": "作业怎么提交，课程回放在哪里看",
+      "style": "term",
+      "gold_titles": [
+        "平台使用指南：作业提交与课程回放"
+      ]
+    },
+    {
+      "id": "PLATFORM-02",
+      "query": "昨天那节课没赶上，还能不能补看",
+      "style": "colloquial",
+      "gold_titles": [
+        "平台使用指南：作业提交与课程回放"
+      ]
+    },
+    {
+      "id": "MIXED-01",
+      "query": "导数的几何意义，还有切线方程怎么求",
+      "style": "term",
+      "gold_titles": [
+        "导数的定义、几何意义与应用"
+      ]
+    },
+    {
+      "id": "HARD-01",
+      "query": "考试前一天才发现公式全忘了怎么办",
+      "style": "colloquial",
+      "gold_titles": [
+        "高效学习方法：间隔重复与主动回忆"
+      ]
+    },
+    {
+      "id": "HARD-02",
+      "query": "二次的式子算不出根，是不是判别式看错了",
+      "style": "colloquial",
+      "gold_titles": [
+        "一元二次方程的解法与判别式"
+      ]
+    },
+    {
+      "id": "HARD-03",
+      "query": "两个物体连在一起被推，怎么求加速度",
+      "style": "colloquial",
+      "gold_titles": [
+        "牛顿运动定律"
+      ]
+    },
+    {
+      "id": "HARD-04",
+      "query": "句子写得出来，但老师总说关系词用错",
+      "style": "colloquial",
+      "gold_titles": [
+        "定语从句关系词的选择"
+      ]
+    },
+    {
+      "id": "HARD-05",
+      "query": "电学里两个量，一个讲强弱一个讲高低",
+      "style": "colloquial",
+      "gold_titles": [
+        "电场强度与电势"
+      ]
+    },
+    {
+      "id": "HARD-06",
+      "query": "图像往上走还是往下走怎么判断",
+      "style": "colloquial",
+      "gold_titles": [
+        "函数单调性的定义与判定"
+      ]
+    },
+    {
+      "id": "HARD-07",
+      "query": "上课错过了，视频还能回看吗",
+      "style": "colloquial",
+      "gold_titles": [
+        "平台使用指南：作业提交与课程回放"
+      ]
+    },
+    {
+      "id": "HARD-08",
+      "query": "英语作文里，过去做的和已经做完的怎么区分",
+      "style": "colloquial",
+      "gold_titles": [
+        "英语时态体系与常见混淆"
+      ]
+    },
+    {
+      "id": "HARD-09",
+      "query": "数学想提前学一点，有没有入门班",
+      "style": "colloquial",
+      "gold_titles": [
+        "同步提升课：高一数学（函数与导数入门）"
+      ]
+    },
+    {
+      "id": "HARD-10",
+      "query": "物理力学快考试了，想集中练几天",
+      "style": "colloquial",
+      "gold_titles": [
+        "冲刺课：高中物理力学专题"
+      ]
+    }
+  ]
+}

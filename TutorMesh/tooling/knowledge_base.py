@@ -27,7 +27,22 @@ from typing import Any, Dict, List, Optional
 
 import chromadb
 
+from .bm25 import BM25Index, fuse_scores, normalize_scores, where_matches
+
 logger = logging.getLogger(__name__)
+
+
+def _env_float(name: str, default: float) -> float:
+    """读取浮点环境变量；非法值回退默认，避免启动期因为一个配置项崩掉。"""
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("环境变量 %s=%r 不是合法数字，回退默认值 %s", name, raw, default)
+        return default
+    return max(0.0, value)
 
 
 class KnowledgeBase:
@@ -44,6 +59,14 @@ class KnowledgeBase:
 
     # 可写入 Chroma metadata 的结构化字段；值必须是标量，便于 where 过滤。
     STRUCTURED_FIELDS = ("subject", "chapter", "difficulty", "grade", "doc_type", "exam")
+
+    # 类级默认值：测试里会用 __new__ 绕过 __init__ 构造实例，
+    # 缺省状态必须是"纯向量检索"，否则这些实例一调用 search 就会 AttributeError。
+    _bm25_weight: float = 0.0
+    _vector_weight: float = 1.0
+    _bm25_index: Optional[Any] = None
+    _bm25_revision: int = -1
+    _revision: int = 0
 
     def __init__(
         self,
@@ -79,6 +102,14 @@ class KnowledgeBase:
             name=self.COLLECTION_NAME,
             metadata={"description": "TutorMesh RAG 知识库"},
         )
+
+        # 混合检索权重：默认对齐 Java 版的 bm25-weight 0.45 / vector-weight 0.55。
+        # 设 TUTORMESH_BM25_WEIGHT=0 可退化为纯向量检索，便于做 A/B 对照。
+        self._bm25_weight = _env_float("TUTORMESH_BM25_WEIGHT", 0.45)
+        self._vector_weight = _env_float("TUTORMESH_VECTOR_WEIGHT", 0.55)
+        self._bm25_index: Optional[BM25Index] = None
+        self._bm25_revision = -1
+        self._revision = 0
 
         # 如果知识库为空，导入默认文档
         seed_demo = os.getenv("TUTORMESH_SEED_DEMO_DOCS", "true").lower() in {"1", "true", "yes"}
@@ -147,6 +178,8 @@ class KnowledgeBase:
                     self._collection.delete(ids=list(stale))
                 count += len(chunks)
         logger.info("知识库写入 %s 个文档片段", count)
+        # 版本号变化会让下次检索重建 BM25 索引，避免新旧语料混在一起打分。
+        self._revision += 1
         return count
 
     @classmethod
@@ -169,47 +202,140 @@ class KnowledgeBase:
 
     def search(self, query: str, top_k: int = 5, where: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        语义检索：根据 query 返回最相关的文档片段。
+        混合检索：向量召回 + BM25 关键词召回，各自归一化后加权融合。
 
-        ChromaDB 内部自动将 query 转为向量，与存储的文档向量做余弦相似度匹配。
-        where 为可选的 Chroma 元数据过滤条件，用于把检索限制在
-        某个学科 / 章节 / 难度内。
+        - 向量这一路负责"意思接近但用词不同"（"分数越加越少" → "通分后分子相加"）；
+        - BM25 这一路负责"术语精确命中"（"单调性""定语从句"这类学科词，
+          向量容易返回近义但不对的章节）；
+        - where 元数据过滤对两路同时生效，避免融合后把别的学科又捞回来。
+
+        TUTORMESH_BM25_WEIGHT=0 时退化为纯向量检索，便于做 A/B 对照。
         """
         if type(top_k) is not int or not 1 <= top_k <= 20:
             raise ValueError("top_k 必须是 1–20 的整数")
         count = self._collection.count()
         if not count:
             return []
-        kwargs: Dict[str, Any] = {
-            "query_texts": [query],
-            "n_results": min(top_k, count),
+
+        # 融合需要候选池：只取 top_k 条向量结果，BM25 就没有空间把长尾捞上来。
+        hybrid = self._bm25_weight > 0 and self._vector_weight > 0
+        pool = min(max(top_k * 4, 20), count) if hybrid else min(top_k, count)
+        vector_items = self._vector_search(query, pool, where)
+        if not hybrid:
+            return self._strip_internal(vector_items)[:top_k]
+
+        index = self._ensure_bm25_index()
+        if index is None or not index.size:
+            return self._strip_internal(vector_items)[:top_k]
+
+        # BM25 打分绕过 Chroma，过滤条件必须在本地重放一次，否则两路召回范围不一致。
+        bm25_filtered = {
+            doc_id: score
+            for doc_id, score in index.scores(query).items()
+            if where_matches(index.metadatas.get(doc_id), where)
         }
+        vector_scores = {item["_chunk_id"]: item["score"] for item in vector_items}
+        fused = fuse_scores(
+            normalize_scores(vector_scores),
+            normalize_scores(bm25_filtered),
+            vector_weight=self._vector_weight,
+            bm25_weight=self._bm25_weight,
+        )
+        if not fused:
+            return []
+
+        by_id = {item["_chunk_id"]: item for item in vector_items}
+        ranked: List[Dict[str, Any]] = []
+        for chunk_id, score in sorted(fused.items(), key=lambda pair: -pair[1])[:top_k]:
+            item = by_id.get(chunk_id) or self._item_from_index(index, chunk_id)
+            if item is None:
+                continue
+            item = dict(item)
+            item["score"] = round(score, 4)
+            item["bm25_score"] = round(bm25_filtered.get(chunk_id, 0.0), 4)
+            ranked.append(item)
+        return self._strip_internal(ranked)
+
+    @staticmethod
+    def _strip_internal(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """去掉融合排序用的内部字段，保持对外结构不变。"""
+        cleaned = []
+        for item in items:
+            if "_chunk_id" in item:
+                item = {key: value for key, value in item.items() if key != "_chunk_id"}
+            cleaned.append(item)
+        return cleaned
+
+    def _vector_search(self, query: str, n_results: int, where: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """纯向量召回；返回结果带内部 _chunk_id，用于和 BM25 的片段 id 对齐。"""
+        kwargs: Dict[str, Any] = {"query_texts": [query], "n_results": n_results}
         if where:
             kwargs["where"] = where
         results = self._collection.query(**kwargs)
 
-        items = []
+        items: List[Dict[str, Any]] = []
         if results["documents"] and results["documents"][0]:
-            for doc, meta, dist in zip(
+            # 兼容只返回 documents/metadatas/distances 的旧实现与测试替身：
+            # 缺 ids 时用 document_id + chunk_index 拼出稳定的片段标识。
+            raw_ids = (results.get("ids") or [[]])[0] if results.get("ids") else []
+            metas = results["metadatas"][0]
+            ids = list(raw_ids) if len(raw_ids) == len(metas) else [
+                f"{(meta or {}).get('document_id', '')}:{(meta or {}).get('chunk_index', index)}"
+                for index, meta in enumerate(metas)
+            ]
+            for chunk_id, doc, meta, dist in zip(
+                ids,
                 results["documents"][0],
-                results["metadatas"][0],
+                metas,
                 results["distances"][0],
             ):
-                items.append({
-                    "title":    meta.get("title", ""),
-                    "content":  doc,
-                    "score":    round(1.0 - dist, 4),  # ChromaDB 返回距离，转为相似度
-                    "chunk":    meta.get("chunk_index", 0),
-                    "document_id": meta.get("document_id", ""),
-                    "version": meta.get("version", ""),
-                    "subject":  meta.get("subject", ""),
-                    "chapter":  meta.get("chapter", ""),
-                    "difficulty": meta.get("difficulty", ""),
-                    "grade":    meta.get("grade", ""),
-                    "doc_type": meta.get("doc_type", ""),
-                })
-
+                items.append(self._build_item(chunk_id, doc, meta or {}, round(1.0 - dist, 4)))
         return items
+
+    @staticmethod
+    def _build_item(chunk_id: str, content: str, meta: Dict[str, Any], score: float) -> Dict[str, Any]:
+        return {
+            "title":    meta.get("title", ""),
+            "content":  content,
+            "score":    score,  # 向量路是余弦相似度，融合后是加权分
+            "chunk":    meta.get("chunk_index", 0),
+            "document_id": meta.get("document_id", ""),
+            "version":  meta.get("version", ""),
+            "subject":  meta.get("subject", ""),
+            "chapter":  meta.get("chapter", ""),
+            "difficulty": meta.get("difficulty", ""),
+            "grade":    meta.get("grade", ""),
+            "doc_type": meta.get("doc_type", ""),
+            "_chunk_id": chunk_id,
+        }
+
+    def _item_from_index(self, index: BM25Index, chunk_id: str) -> Optional[Dict[str, Any]]:
+        """融合结果里只被 BM25 命中的片段，从索引补出内容与元数据。"""
+        meta = index.metadatas.get(chunk_id)
+        if meta is None:
+            return None
+        return self._build_item(chunk_id, index.texts.get(chunk_id, ""), dict(meta), 0.0)
+
+    def _ensure_bm25_index(self) -> Optional[BM25Index]:
+        """按集合版本懒构建 BM25 索引；导入新文档后自动重建。"""
+        if self._bm25_index is not None and self._bm25_revision == self._revision:
+            return self._bm25_index
+        try:
+            with self._write_lock:
+                rows = self._collection.get(include=["documents", "metadatas"])
+        except Exception as exc:  # 索引构建失败不能拖垮检索，退回纯向量
+            logger.warning("BM25 索引构建失败，退回纯向量检索: %s", exc)
+            return None
+        docs = [
+            (chunk_id, doc or "", meta or {})
+            for chunk_id, doc, meta in zip(
+                rows.get("ids") or [], rows.get("documents") or [], rows.get("metadatas") or []
+            )
+        ]
+        self._bm25_index = BM25Index(docs)
+        self._bm25_revision = self._revision
+        logger.info("BM25 索引已构建: %s 个片段", self._bm25_index.size)
+        return self._bm25_index
 
     async def search_async(self, query: str, top_k: int = 5, where: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """异步检索；ChromaDB 客户端为同步实现，因此放入线程池执行。"""
