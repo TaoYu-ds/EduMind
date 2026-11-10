@@ -33,6 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from evaluation.retrieval_corpus import build_corpus  # noqa: E402
 from tooling.knowledge_base import KnowledgeBase  # noqa: E402
 from tooling.tool_manager import MCPToolManager, Tool  # noqa: E402
 
@@ -208,13 +209,16 @@ async def evaluate_pipeline(
 def render_markdown(report: Dict[str, Any]) -> str:
     lines = ["# 检索链路评测报告", ""]
     lines.append(f"- 评测集：{report['case_count']} 条（术语型 {report['styles'].get('term', 0)} / 口语型 {report['styles'].get('colloquial', 0)}）")
-    lines.append(f"- 知识库：默认教材语料，按标题级命中判定")
+    lines.append(f"- 语料：{report.get('corpus_chunks', '?')} 个片段（默认教材 + 同章节干扰文档），标题级命中判定")
     lines.append("")
     lines.append("## 总体指标")
     lines.append("")
     lines.append("| 配置 | Recall@1 | Recall@3 | Recall@5 | MRR@10 | NDCG@10 | 平均耗时 |")
     lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-    for name, block in report["configs"].items():
+    # 只把有区分度的配置放进主表；重排档在 43 篇语料上会饱和，见下方说明。
+    table_configs = [n for n in report["configs"] if n != "pipeline"]
+    for name in table_configs:
+        block = report["configs"][name]
         o = block["overall"]
         lines.append(
             f"| {name} | {o['recall@1']:.2%} | {o['recall@3']:.2%} | {o['recall@5']:.2%} | "
@@ -225,7 +229,8 @@ def render_markdown(report: Dict[str, Any]) -> str:
     lines.append("")
     lines.append("| 配置 | 术语型 Recall@5 | 口语型 Recall@5 | 术语型 MRR@10 | 口语型 MRR@10 |")
     lines.append("| --- | ---: | ---: | ---: | ---: |")
-    for name, block in report["configs"].items():
+    for name in table_configs:
+        block = report["configs"][name]
         term = block["by_style"].get("term", {})
         coll = block["by_style"].get("colloquial", {})
         lines.append(
@@ -237,17 +242,25 @@ def render_markdown(report: Dict[str, Any]) -> str:
     lines.append("")
     lines.append("这组数字要这样读，否则会高估系统能力：")
     lines.append("")
-    lines.append("1. **语料很小**：默认教材库只有 14 篇 / 15 个片段，Top-5 就覆盖三分之一语料，")
-    lines.append("   所以 Recall@5 会触顶（hybrid 起就是 100%）。真正有区分度的是 **Recall@1 和 MRR**，")
-    lines.append("   线上几十万片段的场景不能直接套用这组数字。")
+    lines.append("1. **语料规模仍然偏小**：43 篇 / 43 个片段（14 篇教材 + 29 篇同章节干扰文档），")
+    lines.append("   Top-5 覆盖约 11% 的语料。加入干扰文档是为了让「函数单调性 vs 函数奇偶性」这类近义文档混在一起，")
+    lines.append("   从而测出真实差距；但绝对数值仍不宜外推到业务语料。")
     lines.append("2. **向量基线的低分有系统性原因**：ChromaDB 默认 embedding 是 `all-MiniLM-L6-v2`，")
-    lines.append("   这是英文模型，对中文语料接近随机。这也是本项目真实的缺陷：")
-    lines.append("   向量这一路在中文上几乎不贡献语义能力，**BM25 才是当前召回的主力**。")
-    lines.append("   换中文 embedding（如 bge-small-zh）后基线会明显抬高，那时融合增益要重测。")
-    lines.append("3. **评测集是自建的 42 条**（术语型 18 / 口语型 24），问题由教材标题与章节要点改写而来，")
-    lines.append("   与语料存在词汇重叠，绝对数值偏乐观；它适合做**同数据集内的横向对比**，不适合对外承诺效果。")
-    lines.append("4. **pipeline 配置的真实成本**：每条查询约 2.1 秒（3 条子查询改写 + 1 次重排），")
-    lines.append("   是 hybrid 的 40 倍以上。默认链路没有开重排，就是因为这个延迟换来的 Recall@1 提升需要按场景权衡。")
+    lines.append("   英文模型，对中文语料区分度有限。因此**当前中文检索的主力是 BM25**；")
+    lines.append("   换中文 embedding（如 bge-small-zh）后基线会抬高，融合增益需要重测。")
+    lines.append("3. **评测集是自建的 57 条**（术语型 37 / 口语型 20），其中 16 条标注了多个正确文档")
+    lines.append("   （命中任一即算命中），因此绝对分数偏乐观；它适合做**同数据集内的横向对比**。")
+    lines.append("4. **重排档（pipeline）在这套语料上已经饱和，因此不进主表**：")
+    if "pipeline" in report["configs"]:
+        pipe = report["configs"]["pipeline"]["overall"]
+        lines.append(
+            f"   实测 Recall@1 {pipe['recall@1']:.2%}、MRR {pipe['mrr@10']:.4f}，"
+            f"{pipe['cases']} 条用例全部首位命中。"
+        )
+    lines.append("   原因是重排只需要在 10 个候选标题里挑一个，对模型属于简单判别任务，")
+    lines.append("   指标无法反映真实收益，所以只作为能力上限参考，不作为效果声明。")
+    lines.append("5. **pipeline 配置的真实成本**：每条查询约 2 秒（3 条子查询改写 + 1 次重排），")
+    lines.append("   是 hybrid 的数十倍，默认链路不开重排就是这个原因。")
     lines.append("")
     lines.append("## 未命中的用例")
     lines.append("")
@@ -269,7 +282,15 @@ async def main_async(args: argparse.Namespace) -> int:
         cases = cases[: args.limit]
 
     tmpdir = tempfile.mkdtemp(prefix="tutormesh-retrieval-")
+    seed_kb = KnowledgeBase(chroma_host="127.0.0.1", chroma_port=1, chroma_path=tmpdir)
+    distractors = build_corpus()
+    if distractors:
+        seed_kb.add_documents(distractors)
+    corpus_chunks = seed_kb.doc_count
+    print(f"[语料] {corpus_chunks} 个片段（默认教材 + {len(distractors)} 篇干扰文档）")
+
     report: Dict[str, Any] = {
+        "corpus_chunks": corpus_chunks,
         "case_count": len(cases),
         "styles": {
             "term": sum(1 for c in cases if c.get("style") == "term"),
@@ -296,7 +317,12 @@ async def main_async(args: argparse.Namespace) -> int:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     result_path = RESULTS_DIR / "retrieval_eval.json"
     # 分次跑不同配置时合并历史结果，避免只跑 pipeline 就把 vector/hybrid 的报告覆盖掉。
-    merged: Dict[str, Any] = {"case_count": report["case_count"], "styles": report["styles"], "configs": {}}
+    merged: Dict[str, Any] = {
+        "case_count": report["case_count"],
+        "styles": report["styles"],
+        "corpus_chunks": report.get("corpus_chunks"),
+        "configs": {},
+    }
     if result_path.exists():
         try:
             previous = json.loads(result_path.read_text(encoding="utf-8"))
