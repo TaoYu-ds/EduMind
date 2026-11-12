@@ -48,6 +48,7 @@ def make_tool(
     properties: Dict[str, Any],
     handler: AgentToolHandler,
     required: Optional[List[str]] = None,
+    retry_safe: bool = True,
 ) -> AgentToolSpec:
     """创建带 JSON Schema 的 Agent 工具。"""
     return AgentToolSpec(
@@ -60,6 +61,7 @@ def make_tool(
             "additionalProperties": False,
         },
         handler=handler,
+        retry_safe=retry_safe,
     )
 
 
@@ -649,6 +651,32 @@ def exam_tools() -> Dict[str, AgentToolSpec]:
     }
 
 
+def create_ticket(req: "Request", args: Dict[str, Any]) -> Dict[str, Any]:
+    """升级工具：写入本地工单存储并返回工单号（副作用操作，不可重放）。"""
+    from tooling.ticket_store import get_ticket_store
+
+    reason = str(args.get("reason", "") or "").strip()
+    if not reason:
+        return {"success": False, "error": "reason 不能为空"}
+    summary = str(args.get("summary", "") or "").strip() or req.message
+    ticket = get_ticket_store().create(
+        user_id=req.user_id,
+        conv_id=req.conv_id,
+        request_id=req.request_id,
+        reason=reason[:500],
+        summary=summary[:2000],
+        priority=str(args.get("priority", "normal")),
+        intent=req.intent.value if req.intent else None,
+        urgency=req.urgency.name if req.urgency else None,
+    )
+    return {
+        "success": True,
+        "ticket_id": ticket["ticket_id"],
+        "status": ticket["status"],
+        "created_at": ticket["created_at"],
+    }
+
+
 def escalation_tools() -> Dict[str, AgentToolSpec]:
     return {
         "create_handoff_summary": make_tool(
@@ -656,5 +684,17 @@ def escalation_tools() -> Dict[str, AgentToolSpec]:
             "生成交给老师或人工客服的结构化交接摘要，不会创建真实工单。",
             {"reason": {"type": "string", "description": "需要升级的原因"}},
             create_handoff_summary,
+        ),
+        "create_ticket": make_tool(
+            "create_ticket",
+            "创建人工/教师工单并返回工单号；会写入本地工单存储，属于副作用操作。",
+            {
+                "reason": {"type": "string", "description": "需要升级的原因"},
+                "summary": {"type": "string", "description": "已确认的事实与学生诉求摘要"},
+                "priority": {"type": "string", "enum": ["low", "normal", "high", "urgent"]},
+            },
+            create_ticket,
+            required=["reason"],
+            retry_safe=False,
         ),
     }

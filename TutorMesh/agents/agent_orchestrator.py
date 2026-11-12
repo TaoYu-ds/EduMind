@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
+from agents.tool_policy import filter_tools
 from agents.tools import (
     AgentToolSpec,
     build_shared_rag_tools,
@@ -274,6 +275,23 @@ class BaseAgent:
         """返回该角色真实可调用的工具白名单。"""
         return dict(self._shared_tools)
 
+    def get_tools_for(self, req: "Request") -> Dict[str, AgentToolSpec]:
+        """
+        按本次请求的意图收敛工具白名单（角色白名单的子集）。
+
+        角色白名单回答「这个 Agent 能碰什么」，这里回答「这一次该给它什么」。
+        TUTORMESH_TOOL_POLICY=false 可关闭，回到纯角色白名单，便于对照实验。
+        """
+        tools = self.get_tools()
+        if os.getenv("TUTORMESH_TOOL_POLICY", "true").lower() not in {"1", "true", "yes"}:
+            return tools
+        return filter_tools(
+            tools,
+            intent=req.intent,
+            intent_group=req.intent_group,
+            urgency=req.urgency,
+        )
+
     def set_shared_tools(self, tools: Optional[Dict[str, AgentToolSpec]]) -> None:
         self._shared_tools = {name: spec for name, spec in (tools or {}).items()
                               if spec.allowed_agents is None or self.agent_type.value in spec.allowed_agents}
@@ -345,7 +363,7 @@ class BaseAgent:
             messages.append({"role": "user", "content": f"[结构化实体]\n{_clean(entities_text)}"})
         messages.append({"role": "user", "content": _clean(req.message)})
 
-        tools = self.get_tools()
+        tools = self.get_tools_for(req)
         tools_used: List[str] = []
         tool_traces: List[Dict[str, Any]] = []
         try:

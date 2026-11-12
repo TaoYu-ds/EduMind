@@ -26,3 +26,7 @@ python-dotenv==1.0.1
 mcp==1.26.0
 sse-starlette>=2.1,<3
 pydantic-settings==2.12.0
+
+# ── Agent 编排（可选）─────────────────────────────────────────────────────────
+# 仅 TUTORMESH_WORKFLOW_ENGINE=graph 时需要；legacy 手写链路不依赖。
+langgraph>=1.0,<2.0

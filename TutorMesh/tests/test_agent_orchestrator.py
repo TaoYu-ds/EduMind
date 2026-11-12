@@ -147,7 +147,7 @@ def test_agent_tool_scopes_are_real_and_isolated():
     assert tutor_tools == {"build_explanation_scaffold", "classify_learning_blocker"}
     assert plan_tools == {"build_study_plan", "check_plan_feasibility"}
     assert exam_tools == {"lookup_exam_process", "check_exam_fields"}
-    assert escalation_tools == {"create_handoff_summary"}
+    assert escalation_tools == {"create_handoff_summary", "create_ticket"}
     assert not general_tools & tutor_tools
     assert not tutor_tools & plan_tools
     assert not plan_tools & exam_tools

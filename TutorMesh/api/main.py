@@ -47,6 +47,7 @@ BANNER = r"""
 
 # ── 全局组件（lifespan 中初始化）─────────────────────────────────────────────
 _orchestrator = None
+_engine       = None
 _memory       = None
 _tool_manager = None
 _monitor      = None
@@ -75,7 +76,7 @@ def _anthropic_cfg() -> Dict[str, Any]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _eval_orchestrator, _eval_tool_manager, _orchestrator, _memory, _tool_manager, _monitor, _evaluator, _skill_manager, _profile_updater, _mcp_client
+    global _eval_orchestrator, _eval_tool_manager, _orchestrator, _engine, _memory, _tool_manager, _monitor, _evaluator, _skill_manager, _profile_updater, _mcp_client
 
     from core.access import identity
     identity("")  # 启动时验证生产鉴权配置
@@ -115,6 +116,18 @@ async def lifespan(app: FastAPI):
         model=cfg["model"],
         skill_manager=_skill_manager,
     )
+
+    # 编排引擎：默认 legacy 手写链路；TUTORMESH_WORKFLOW_ENGINE=graph 切换为 LangGraph 状态图。
+    _engine = _orchestrator
+    if os.getenv("TUTORMESH_WORKFLOW_ENGINE", "legacy").lower() == "graph":
+        from agents.workflow_graph import GraphWorkflow
+        _engine = GraphWorkflow(
+            _orchestrator,
+            max_retries=int(os.getenv("TUTORMESH_WORKFLOW_MAX_RETRIES", "1")),
+        )
+        logger.info("编排引擎: LangGraph StateGraph（max_retries=%s）", _engine.max_retries)
+    else:
+        logger.info("编排引擎: legacy AgentOrchestrator")
 
     # 记忆管理器（Redis 工作记忆 + ChromaDB 情景记忆/用户画像）
     _memory = MemoryManager(
@@ -454,7 +467,7 @@ async def chat(req: ChatRequest, http_request: HTTPRequest):
 
             # 3. 执行
             with measure_stage("agent_execution"):
-                result = await _orchestrator.run(orch_req)
+                result = await (_engine or _orchestrator).run(orch_req)
 
             response = ChatResponse(
                 conv_id=conv_id,
